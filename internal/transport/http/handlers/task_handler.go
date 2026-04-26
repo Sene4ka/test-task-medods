@@ -31,6 +31,7 @@ func (h *TaskHandler) Create(w http.ResponseWriter, r *http.Request) {
 		Title:       req.Title,
 		Description: req.Description,
 		Status:      req.Status,
+		Recurrence:  dtoToRecurrence(req.Recurrence),
 	})
 	if err != nil {
 		writeUsecaseError(w, err)
@@ -73,6 +74,7 @@ func (h *TaskHandler) Update(w http.ResponseWriter, r *http.Request) {
 		Title:       req.Title,
 		Description: req.Description,
 		Status:      req.Status,
+		Recurrence:  dtoToRecurrence(req.Recurrence),
 	})
 	if err != nil {
 		writeUsecaseError(w, err)
@@ -109,6 +111,30 @@ func (h *TaskHandler) List(w http.ResponseWriter, r *http.Request) {
 		response = append(response, newTaskDTO(&tasks[i]))
 	}
 
+	writeJSON(w, http.StatusOK, response)
+}
+
+func (h *TaskHandler) ListOccurrences(w http.ResponseWriter, r *http.Request) {
+	from := r.URL.Query().Get("from")
+	to := r.URL.Query().Get("to")
+	if from == "" || to == "" {
+		writeError(w, http.StatusBadRequest, errors.New("'from' and 'to' query params are required (YYYY-MM-DD)"))
+		return
+	}
+
+	occurrences, err := h.usecase.ListOccurrences(r.Context(), from, to)
+	if err != nil {
+		writeUsecaseError(w, err)
+		return
+	}
+
+	response := make([]occurrenceDTO, 0, len(occurrences))
+	for _, o := range occurrences {
+		response = append(response, occurrenceDTO{
+			Date: o.Date.Format("2006-01-02"),
+			Task: newTaskDTO(&o.Task),
+		})
+	}
 	writeJSON(w, http.StatusOK, response)
 }
 

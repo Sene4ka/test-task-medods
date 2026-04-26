@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Task Service API",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "description": "CRUD API for tasks built with clean architecture."
   },
   "servers": [
@@ -14,6 +14,10 @@
     {
       "name": "Tasks",
       "description": "Operations with tasks"
+    },
+    {
+      "name": "Occurrences",
+      "description": "Query recurring task occurrences by date range"
     }
   ],
   "paths": {
@@ -21,6 +25,7 @@
       "get": {
         "tags": ["Tasks"],
         "summary": "List tasks",
+        "description": "Returns all tasks (templates). For recurring tasks, use `/api/v1/tasks/occurrences` to get expanded dates.",
         "responses": {
           "200": {
             "description": "Task list",
@@ -38,11 +43,75 @@
       "post": {
         "tags": ["Tasks"],
         "summary": "Create task",
+        "description": "Creates a task. Include `recurrence` to make it a recurring task.",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
-              "schema": { "$ref": "#/components/schemas/CreateTaskRequest" }
+              "schema": { "$ref": "#/components/schemas/CreateTaskRequest" },
+              "examples": {
+                "simple": {
+                  "summary": "One-off task",
+                  "value": {
+                    "title": "Prepare release",
+                    "description": "Collect release notes and check migrations",
+                    "status": "new"
+                  }
+                },
+                "daily": {
+                  "summary": "Daily task (every 2 days)",
+                  "value": {
+                    "title": "Patient call-round",
+                    "description": "Call all patients on the list",
+                    "status": "new",
+                    "recurrence": {
+                      "type": "daily",
+                      "interval": 2,
+                      "start_date": "2026-05-01",
+                      "end_date": "2026-12-31"
+                    }
+                  }
+                },
+                "monthly": {
+                  "summary": "Monthly task (15th of each month)",
+                  "value": {
+                    "title": "Monthly reporting",
+                    "description": "Generate monthly KPI report",
+                    "status": "new",
+                    "recurrence": {
+                      "type": "monthly",
+                      "day_of_month": 15,
+                      "start_date": "2026-05-01"
+                    }
+                  }
+                },
+                "specific_dates": {
+                  "summary": "Specific dates",
+                  "value": {
+                    "title": "Board meeting prep",
+                    "description": "Prepare materials for board meeting",
+                    "status": "new",
+                    "recurrence": {
+                      "type": "specific_dates",
+                      "dates": ["2026-06-01", "2026-09-01", "2026-12-01"],
+                      "start_date": "2026-06-01"
+                    }
+                  }
+                },
+                "even_odd": {
+                  "summary": "Even days only",
+                  "value": {
+                    "title": "Inventory check",
+                    "description": "Check medical supply inventory",
+                    "status": "new",
+                    "recurrence": {
+                      "type": "even_odd",
+                      "parity": "even",
+                      "start_date": "2026-05-01"
+                    }
+                  }
+                }
+              }
             }
           }
         },
@@ -59,17 +128,85 @@
         }
       }
     },
+    "/api/v1/tasks/occurrences": {
+      "get": {
+        "tags": ["Occurrences"],
+        "summary": "List occurrences",
+        "description": "Returns all occurrences of recurring tasks within the given date range [from, to] inclusive. Maximum range: 366 days. One-off tasks (no recurrence) are not included.",
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "required": true,
+            "description": "Start of date range (inclusive), format YYYY-MM-DD",
+            "schema": { "type": "string", "format": "date", "example": "2026-05-01" }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": true,
+            "description": "End of date range (inclusive), format YYYY-MM-DD",
+            "schema": { "type": "string", "format": "date", "example": "2026-05-31" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of occurrences",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/Occurrence" }
+                },
+                "example": [
+                  {
+                    "date": "2026-05-01",
+                    "task": {
+                      "id": 1,
+                      "title": "Patient call-round",
+                      "description": "Call all patients on the list",
+                      "status": "new",
+                      "recurrence": {
+                        "type": "daily",
+                        "interval": 2,
+                        "start_date": "2026-05-01",
+                        "end_date": "2026-12-31"
+                      },
+                      "created_at": "2026-04-24T10:00:00Z",
+                      "updated_at": "2026-04-24T10:00:00Z"
+                    }
+                  },
+                  {
+                    "date": "2026-05-03",
+                    "task": {
+                      "id": 1,
+                      "title": "Patient call-round",
+                      "description": "Call all patients on the list",
+                      "status": "new",
+                      "recurrence": {
+                        "type": "daily",
+                        "interval": 2,
+                        "start_date": "2026-05-01",
+                        "end_date": "2026-12-31"
+                      },
+                      "created_at": "2026-04-24T10:00:00Z",
+                      "updated_at": "2026-04-24T10:00:00Z"
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" }
+        }
+      }
+    },
     "/api/v1/tasks/{id}": {
       "get": {
         "tags": ["Tasks"],
         "summary": "Get task by ID",
         "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": { "type": "integer", "format": "int64", "minimum": 1 }
-          }
+          { "$ref": "#/components/parameters/TaskID" }
         ],
         "responses": {
           "200": {
@@ -86,13 +223,9 @@
       "put": {
         "tags": ["Tasks"],
         "summary": "Update task",
+        "description": "Replaces all task fields. Pass `recurrence: null` (or omit it) to remove the recurrence rule.",
         "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": { "type": "integer", "format": "int64", "minimum": 1 }
-          }
+          { "$ref": "#/components/parameters/TaskID" }
         ],
         "requestBody": {
           "required": true,
@@ -118,13 +251,9 @@
       "delete": {
         "tags": ["Tasks"],
         "summary": "Delete task",
+        "description": "Deletes the task and its recurrence rule. Occurrences are computed, not stored, so no extra cleanup is needed.",
         "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": { "type": "integer", "format": "int64", "minimum": 1 }
-          }
+          { "$ref": "#/components/parameters/TaskID" }
         ],
         "responses": {
           "204": { "description": "Deleted" },
@@ -134,6 +263,15 @@
     }
   },
   "components": {
+    "parameters": {
+      "TaskID": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "schema": { "type": "integer", "format": "int64", "minimum": 1 },
+        "example": 1
+      }
+    },
     "responses": {
       "BadRequest": {
         "description": "Bad request",
@@ -153,22 +291,89 @@
       }
     },
     "schemas": {
+      "RecurrenceType": {
+        "type": "string",
+        "enum": ["daily", "monthly", "specific_dates", "even_odd"],
+        "description": "Type of recurrence rule:\n- `daily` — repeat every N days (controlled by `interval`)\n- `monthly` — repeat on a specific day of month (controlled by `day_of_month`)\n- `specific_dates` — only on the listed dates (controlled by `dates`)\n- `even_odd` — only on even or odd calendar days (controlled by `parity`)"
+      },
+      "Recurrence": {
+        "type": "object",
+        "required": ["type", "start_date"],
+        "description": "Recurrence rule for the task. Only fields relevant to the chosen `type` are used.",
+        "properties": {
+          "type": { "$ref": "#/components/schemas/RecurrenceType" },
+          "interval": {
+            "type": "integer",
+            "minimum": 1,
+            "default": 1,
+            "description": "**daily only.** Repeat every N days. Defaults to 1 (every day).",
+            "example": 2
+          },
+          "day_of_month": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 31,
+            "description": "**monthly only.** Day of month to repeat on (1–31). Months shorter than the given day are skipped.",
+            "example": 15
+          },
+          "dates": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "date"
+            },
+            "minItems": 1,
+            "description": "**specific_dates only.** Explicit list of dates (YYYY-MM-DD).",
+            "example": ["2026-06-01", "2026-09-01", "2026-12-01"]
+          },
+          "parity": {
+            "type": "string",
+            "enum": ["even", "odd"],
+            "description": "**even_odd only.** Whether to trigger on even or odd calendar days of the month.",
+            "example": "even"
+          },
+          "start_date": {
+            "type": "string",
+            "format": "date",
+            "description": "Earliest date from which the rule applies (inclusive). Required.",
+            "example": "2026-05-01"
+          },
+          "end_date": {
+            "type": "string",
+            "format": "date",
+            "description": "Latest date up to which the rule applies (inclusive). Optional — if omitted, the rule repeats indefinitely (bounded by the `to` param when querying occurrences).",
+            "example": "2026-12-31"
+          }
+        },
+        "example": {
+          "type": "daily",
+          "interval": 1,
+          "start_date": "2026-05-01",
+          "end_date": "2026-12-31"
+        }
+      },
       "CreateTaskRequest": {
         "type": "object",
         "required": ["title"],
         "properties": {
           "title": {
             "type": "string",
-            "example": "Prepare release"
+            "example": "Patient call-round"
           },
           "description": {
             "type": "string",
-            "example": "Collect release notes and check migrations"
+            "example": "Call all patients on the list"
           },
           "status": {
             "type": "string",
             "enum": ["new", "in_progress", "done"],
+            "default": "new",
             "example": "new"
+          },
+          "recurrence": {
+            "nullable": true,
+            "allOf": [{ "$ref": "#/components/schemas/Recurrence" }],
+            "description": "Optional recurrence rule. Omit or set to `null` for a one-off task."
           }
         }
       },
@@ -178,16 +383,21 @@
         "properties": {
           "title": {
             "type": "string",
-            "example": "Prepare release"
+            "example": "Patient call-round"
           },
           "description": {
             "type": "string",
-            "example": "Collect release notes and check migrations"
+            "example": "Call all patients on the list"
           },
           "status": {
             "type": "string",
             "enum": ["new", "in_progress", "done"],
             "example": "in_progress"
+          },
+          "recurrence": {
+            "nullable": true,
+            "allOf": [{ "$ref": "#/components/schemas/Recurrence" }],
+            "description": "Set to `null` to remove the recurrence rule. Omit to keep the existing rule."
           }
         }
       },
@@ -195,25 +405,45 @@
         "type": "object",
         "properties": {
           "id": { "type": "integer", "format": "int64", "example": 1 },
-          "title": { "type": "string", "example": "Prepare release" },
+          "title": { "type": "string", "example": "Patient call-round" },
           "description": {
             "type": "string",
-            "example": "Collect release notes and check migrations"
+            "example": "Call all patients on the list"
           },
           "status": {
             "type": "string",
             "enum": ["new", "in_progress", "done"],
             "example": "new"
           },
+          "recurrence": {
+            "nullable": true,
+            "allOf": [{ "$ref": "#/components/schemas/Recurrence" }],
+            "description": "Recurrence rule, or `null` for one-off tasks."
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
-            "example": "2026-03-24T00:00:00Z"
+            "example": "2026-04-24T10:00:00Z"
           },
           "updated_at": {
             "type": "string",
             "format": "date-time",
-            "example": "2026-03-24T00:00:00Z"
+            "example": "2026-04-24T10:00:00Z"
+          }
+        }
+      },
+      "Occurrence": {
+        "type": "object",
+        "description": "A single occurrence of a recurring task on a specific date.",
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date",
+            "description": "The date this occurrence falls on.",
+            "example": "2026-05-01"
+          },
+          "task": {
+            "$ref": "#/components/schemas/Task"
           }
         }
       },
