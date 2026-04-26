@@ -65,7 +65,7 @@ http://localhost:8080/swagger/openapi.json
 ```json
 {
   "type": "daily",
-  "interval": 2,
+  "interval": 3,
   "start_date": "2026-05-01",
   "end_date": "2026-12-31"
 }
@@ -122,7 +122,7 @@ GET /api/v1/tasks/occurrences?from=2026-05-01&to=2026-05-07
     "task": { "id": 1, "title": "Ежедневный обзвон", "recurrence": { ... }, ... }
   },
   {
-    "date": "2026-05-03",
+    "date": "2026-05-02",
     "task": { "id": 1, "title": "Ежедневный обзвон", "recurrence": { ... }, ... }
   }
 ]
